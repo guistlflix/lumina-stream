@@ -48,6 +48,8 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
 /** POST /api/xc  — forwards a player_api.php call and returns its JSON. */
 export async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (req.method !== "POST") return sendJson(res, 405, { error: "method not allowed" });
+  // Requiring JSON forces a CORS preflight, so other sites open in the browser cannot fire "simple" cross-site POSTs here.
+  if (!/^application\/json\b/i.test(req.headers["content-type"] ?? "")) return sendJson(res, 415, { error: "content-type must be application/json" });
 
   const parsed = ApiRequest.safeParse(await readJsonBody(req));
   if (!parsed.success) return sendJson(res, 400, { error: "invalid request", issues: parsed.error.issues });
