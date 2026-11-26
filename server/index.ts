@@ -11,6 +11,7 @@ setDefaultResultOrder("ipv4first");
 const PORT = Number(process.env.PORT ?? 8787);
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PROD = process.argv.includes("--prod");
+const ALLOWED_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", HOST.toLowerCase()]);
 const DIST = resolve(import.meta.dirname, "../dist");
 
 const MIME: Record<string, string> = {
@@ -50,6 +51,13 @@ async function main(): Promise<void> {
   }
 
   const server = createServer((req, res) => {
+    // DNS-rebinding guard: a hostile domain resolving to 127.0.0.1 still sends its own name in Host.
+    const hostName = (req.headers.host ?? "").replace(/:\d+$/, "").toLowerCase();
+    if (!ALLOWED_HOSTS.has(hostName)) {
+      console.warn(`[server] rejected request with host "${hostName}"`);
+      res.writeHead(403, { "content-type": "text/plain" }).end("forbidden host");
+      return;
+    }
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? `${HOST}:${PORT}`}`);
     const route = async (): Promise<void> => {
       if (url.pathname === "/api/xc") return handleApi(req, res);
